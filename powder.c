@@ -4,11 +4,14 @@
 #include <math.h>
 #include <SDL/SDL.h>
 #ifdef PSP
+#define JOYSTICK
 #include <pspkernel.h>
 #include <psptypes.h>
 PSP_HEAP_SIZE_KB(-1024);
 PSP_MAIN_THREAD_ATTR(PSP_THREAD_ATTR_VFPU);
 #endif
+
+inline int psp_rand();
 
 #undef PLOSS
 #define FLAG_STAGNANT 1
@@ -1357,7 +1360,7 @@ void update_particles(unsigned *vid)
 
 SDL_Surface *sdl_scrn;
 int sdl_key;
-#ifdef PSP
+#ifdef JOYSTICK
 SDL_Joystick *joy;
 #endif
 
@@ -1373,10 +1376,10 @@ void sdl_open(void)
         fprintf(stderr, "Creating window: %s\n", SDL_GetError());
         exit(1);
     }
-   #ifdef PSP
+#ifdef JOYSTICK
     joy = SDL_JoystickOpen(0);
     SDL_JoystickEventState(SDL_ENABLE);
-    #endif
+#endif
 
 }
 
@@ -1905,13 +1908,13 @@ int main(int argc, char *argv[])
 	if(vs)
 	    dump_frame(vid_buf, XRES, YRES, XRES*4);
 
-   #ifdef PSP
-        b = PSP_GetFakeMouseState(&x, &y, vid_buf, &sl, &sr);
-        mk = PSP_GetModState();
-        #else
+   #ifdef JOYSTICK
+        b = JOY_GetFakeMouseState(&x, &y, vid_buf, &sl, &sr);
+        mk = JOY_GetModState();
+   #else
         b = SDL_GetMouseState(&x, &y);
         mk = SDL_GetModState();
-        #endif
+   #endif
 
 	if(y >= SCALE*YRES) {
 	    tx = (x/SCALE)/32;
@@ -2041,10 +2044,24 @@ int main(int argc, char *argv[])
     }
     return 0;
 }
-#ifdef PSP
+
+inline int psp_rand() {
+#ifdef VFPU
+	int result;
+	__asm__ volatile (
+	"vrndi.s S000\n"
+	"mfv %0, S000\n"
+	: "=r"(result));
+	return (result ^ (result >> 31)) - (result >> 31);
+}
+#else
+	return rand();
+}
+
+#ifdef JOYSTICK
 int b3 = 0;
 int b1 = 0;
-int PSP_GetFakeMouseState(int *x, int *y, unsigned *vid_buf, int *sl, int *sr) {
+int JOY_GetFakeMouseState(int *x, int *y, unsigned *vid_buf, int *sl, int *sr) {
         int jmx = *x;
         int jmy = *y;
         if(SDL_JoystickGetButton(joy, 9)) jmx = jmx + 3;
@@ -2085,22 +2102,10 @@ int PSP_GetFakeMouseState(int *x, int *y, unsigned *vid_buf, int *sl, int *sr) {
         if(SDL_JoystickGetButton(joy, 5) || SDL_JoystickGetButton(joy, 0) || SDL_JoystickGetButton(joy, 4)) return SDL_BUTTON(1);
         return 0;
 }
-int PSP_GetModState() {
+int JOY_GetModState() {
         if(SDL_JoystickGetButton(joy, 0)) return KMOD_CTRL;
         if(SDL_JoystickGetButton(joy, 4)) return KMOD_SHIFT;
         return 0;
-}
-inline int psp_rand() {
-#ifdef VFPU
-	int result;
-	__asm__ volatile (
-	"vrndi.s S000\n"
-	"mfv %0, S000\n"
-	: "=r"(result));
-	return (result ^ (result >> 31)) - (result >> 31);
-}
-#else
-	return rand();
 }
 #endif
 #endif
