@@ -42,14 +42,24 @@ char *it_msg =
 
 unsigned char bmap[YRES/CELL][XRES/CELL];
 
-float vx[YRES/CELL][XRES/CELL], ovx[YRES/CELL][XRES/CELL];
-float vy[YRES/CELL][XRES/CELL], ovy[YRES/CELL][XRES/CELL];
-float pv[YRES/CELL][XRES/CELL], opv[YRES/CELL][XRES/CELL];
+float vx[YRES/CELL][XRES/CELL] __attribute__ ((aligned (16)));
+float ovx[YRES/CELL][XRES/CELL] __attribute__ ((aligned (16)));
+float vy[YRES/CELL][XRES/CELL] __attribute__ ((aligned (16)));
+float ovy[YRES/CELL][XRES/CELL] __attribute__ ((aligned (16)));
+float pv[YRES/CELL][XRES/CELL] __attribute__ ((aligned (16))); 
+float opv[YRES/CELL][XRES/CELL] __attribute__ ((aligned (16)));
 #define TSTEPP 0.3f
 #define TSTEPV 0.4f
 #define VADV 0.3f
 #define VLOSS 0.995f
 #define PLOSS 0.995f
+
+#ifdef VFPU
+static ScePspFVector4 ploss = {PLOSS, PLOSS, PLOSS, PLOSS};
+static ScePspFVector4 tstepp = {TSTEPP, TSTEPP, TSTEPP, TSTEPP};
+static ScePspFVector4 vloss = {VLOSS, VLOSS, VLOSS, VLOSS};
+static ScePspFVector4 tstepv = {TSTEPV, TSTEPV, TSTEPV, TSTEPV};
+#endif
 
 float kernel[9];
 void make_kernel(void)
@@ -79,21 +89,10 @@ void update_air(void)
 {
     int x, y, i, j;
     float dp, dx, dy, f, tx, ty;
-  #ifdef VFPU
-    ScePspFVector4 ploss = {PLOSS, PLOSS, PLOSS, PLOSS};
-    ScePspFVector4 tstepp = {TSTEPP, TSTEPP, TSTEPP, TSTEPP};
-    ScePspFVector4 vloss = {VLOSS, VLOSS, VLOSS, VLOSS};
-    ScePspFVector4 tstepv = {TSTEPV, TSTEPV, TSTEPV, TSTEPV};
-    #endif
 
     for(y=1; y<YRES/CELL; y++) {
         #ifdef VFPU
         for(x=1; x<XRES/CELL-4; x+=4) {
-        ScePspFVector4 vxyx = {vx[y][x], vx[y][x+1], vx[y][x+2], vx[y][x+3]};
-        ScePspFVector4 vxyxm1 = {vx[y][x-1], vx[y][x], vx[y][x+1], vx[y][x+2]};
-        ScePspFVector4 vyyx = {vy[y][x], vy[y][x+1], vy[y][x+2], vy[y][x+3]};
-        ScePspFVector4 vyyxm1 = {vy[y-1][x], vy[y-1][x+1], vy[y-1][x+2], vy[y-1][x+3]};
-        ScePspFVector4 pvyx = {pv[y][x], pv[y][x+1], pv[y][x+2], pv[y][x+3]};
         __asm__ volatile (
                 "lv.q C100, %1\n"
                 "lv.q C110, %2\n"
@@ -109,18 +108,9 @@ void update_air(void)
                 "vmul.q C100, C130, C100\n"
                 "vadd.q C100, C110, C100\n"
                 "sv.q C100, %0\n"
-         : "+m"(pvyx) : "m"(vxyx), "m"(vxyxm1), "m"(vyyx), "m"(vyyxm1), "m"(ploss), "m"(tstepp));
-        pv[y][x] = pvyx.x;
-        pv[y][x+1] = pvyx.y;
-        pv[y][x+2] = pvyx.z;
-        pv[y][x+3] = pvyx.w;
+         : "+m"(pv[y][x]) : "m"(vx[y][x]), "m"(vx[y][x-1]), "m"(vy[y][x]), "m"(vy[y][x-1]), "m"(ploss), "m"(tstepp));
         }
 	x = XRES/CELL-3;	
-        ScePspFVector4 vxyx = {vx[y][x], vx[y][x+1], vx[y][x+2], 0.0f};
-        ScePspFVector4 vxyxm1 = {vx[y][x-1], vx[y][x], vx[y][x+1], vx[y][x+2]};
-        ScePspFVector4 vyyx = {vy[y][x], vy[y][x+1], vy[y][x+2], 0.0f};
-        ScePspFVector4 vyyxm1 = {vy[y-1][x], vy[y-1][x+1], vy[y-1][x+2], 0.0f};
-        ScePspFVector4 pvyx = {pv[y][x], pv[y][x+1], pv[y][x+2], 0.0f};
         __asm__ volatile (
                 "lv.q C100, %1\n"
                 "lv.q C110, %2\n"
@@ -136,10 +126,7 @@ void update_air(void)
                 "vmul.q C100, C130, C100\n"
                 "vadd.q C100, C110, C100\n"
                 "sv.q C100, %0\n"
-         : "+m"(pvyx) : "m"(vxyx), "m"(vxyxm1), "m"(vyyx), "m"(vyyxm1), "m"(ploss), "m"(tstepp));
-        pv[y][x] = pvyx.x;
-        pv[y][x+1] = pvyx.y;
-        pv[y][x+2] = pvyx.z;
+         : "+m"(pv[y][x]) : "m"(vx[y][x]), "m"(vx[y][x-1]), "m"(vy[y][x]), "m"(vy[y][x-1]), "m"(ploss), "m"(tstepp));
 	#else
 	for(x=1; x<XRES/CELL; x++) {
 	    dp = 0.0f;
@@ -153,11 +140,6 @@ void update_air(void)
     for(y=0; y<YRES/CELL-1; y++) {
 	#ifdef VFPU
 	        for(x=0; x<XRES/CELL-4; x+=4) {
-            ScePspFVector4 pvyx = {pv[y][x], pv[y][x+1], pv[y][x+2], pv[y][x+3]};
-            ScePspFVector4 pvyxp1 = {pv[y][x+1], pv[y][x+2], pv[y][x+3], pv[y][x+4]};
-            ScePspFVector4 pvyp1x = {pv[y+1][x], pv[y+1][x+1], pv[y+1][x+2], pv[y+1][x+3]};
-	    ScePspFVector4 vxyx = {vx[y][x], vx[y][x+1], vx[y][x+2], vx[y][x+3]};
-            ScePspFVector4 vyyx = {vy[y][x], vy[y][x+1], vy[y][x+2], vy[y][x+3]};
         __asm__ volatile (
                 "lv.q C100, %2\n"
                 "lv.q C110, %3\n"
@@ -176,15 +158,7 @@ void update_air(void)
                 "vadd.q C130, C120, C130\n" // vy + dy
                 "sv.q C100, %0\n"
                 "sv.q C130, %1\n"
-        : "+m"(vxyx), "+m"(vyyx) : "m"(pvyx), "m"(pvyxp1), "m"(pvyp1x), "m"(vloss), "m"(tstepv));
-        vx[y][x] = vxyx.x;
-        vx[y][x+1] = vxyx.y;
-        vx[y][x+2] = vxyx.z;
-        vx[y][x+3] = vxyx.w;
-        vy[y][x] = vyyx.x;
-        vy[y][x+1] = vyyx.y;
-        vy[y][x+2] = vyyx.z;
-        vy[y][x+3] = vyyx.w;
+        : "+m"(vx[y][x]), "+m"(vy[y][x]) : "m"(pv[y][x]), "m"(pv[y][x+1]), "m"(pv[y+1][x]), "m"(vloss), "m"(tstepv));
         for(i=0;i<4;i++) {
                 if(bmap[y][x+i] == 1 || bmap[y][x+i+1] == 1) {
                         vx[y][x+i] = 0;
