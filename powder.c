@@ -12,6 +12,10 @@ PSP_MAIN_THREAD_ATTR(PSP_THREAD_ATTR_VFPU);
 #endif
 
 inline int psp_rand();
+#ifdef JOYSTICK
+int JOY_GetFakeMouseState(int *x, int *y, unsigned *vid_buf, int *sl, int *sr);
+int JOY_GetModState();
+#endif
 
 #undef PLOSS
 #define FLAG_STAGNANT 1
@@ -108,7 +112,7 @@ void update_air(void)
                 "vmul.q C100, C130, C100\n"
                 "vadd.q C100, C110, C100\n"
                 "sv.q C100, %0\n"
-         : "+m"(pv[y][x]) : "m"(vx[y][x]), "m"(vx[y][x-1]), "m"(vy[y][x]), "m"(vy[y][x-1]), "m"(ploss), "m"(tstepp));
+         : "+m"(pv[y][x]) : "m"(vx[y][x]), "m"(vx[y][x-1]), "m"(vy[y][x]), "m"(vy[y-1][x]), "m"(ploss), "m"(tstepp));
         }
 	x = XRES/CELL-3;	
         __asm__ volatile (
@@ -126,7 +130,7 @@ void update_air(void)
                 "vmul.q C100, C130, C100\n"
                 "vadd.q C100, C110, C100\n"
                 "sv.q C100, %0\n"
-         : "+m"(pv[y][x]) : "m"(vx[y][x]), "m"(vx[y][x-1]), "m"(vy[y][x]), "m"(vy[y][x-1]), "m"(ploss), "m"(tstepp));
+         : "+m"(pv[y][x]) : "m"(vx[y][x]), "m"(vx[y][x-1]), "m"(vy[y][x]), "m"(vy[y-1][x]), "m"(ploss), "m"(tstepp));
 	#else
 	for(x=1; x<XRES/CELL; x++) {
 	    dp = 0.0f;
@@ -2031,7 +2035,7 @@ inline int psp_rand() {
 #else
 	return rand();
 }
-
+#endif
 #ifdef JOYSTICK
 int b3 = 0;
 int b1 = 0;
@@ -2081,5 +2085,4 @@ int JOY_GetModState() {
         if(SDL_JoystickGetButton(joy, 4)) return KMOD_SHIFT;
         return 0;
 }
-#endif
 #endif
