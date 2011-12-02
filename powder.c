@@ -7,6 +7,8 @@
 #define JOYSTICK
 #include <pspkernel.h>
 #include <psptypes.h>
+#include <psppower.h>
+#include "vfpu.h"
 PSP_HEAP_SIZE_KB(-1024);
 PSP_MAIN_THREAD_ATTR(THREAD_ATTR_USER | PSP_THREAD_ATTR_VFPU);
 #endif
@@ -44,7 +46,7 @@ char *it_msg =
  *                   AIR FLOW SIMULATOR                    *
  ***********************************************************/
 
-unsigned char bmap[YRES/CELL][XRES/CELL];
+unsigned char bmap[YRES/CELL][XRES/CELL] __attribute__ ((aligned (16)));
 
 float vx[YRES/CELL][XRES/CELL] __attribute__ ((aligned (16)));
 float ovx[YRES/CELL][XRES/CELL] __attribute__ ((aligned (16)));
@@ -147,7 +149,7 @@ void update_air(void)
                 "sv.q C130, %1\n"
         : "+m"(vx[y][x]), "+m"(vy[y][x]) : "m"(pv[y][x]), "m"(pv[y][x+1]), "m"(pv[y+1][x]), "m"(vloss), "m"(tstepv));
 	}
-        for(i=0;i<4;i++) {
+	for(i=0;i<4;i++) {
                 if(bmap[y][x+i] == 1 || bmap[y][x+i+1] == 1) {
                         vx[y][x+i] = 0;
                 }
@@ -155,7 +157,43 @@ void update_air(void)
                         vy[y][x+i] = 0;
                 }
         }
-
+        /*
+        __asm__ (
+         "lv.s S300, %2\n" // bmap[y][x]
+         "lv.s S301, %3\n" // bmap[y][x+1]
+         "lv.s S302, %4\n" // bmap[y+1][x]
+         "lv.q C130, %0\n" // vx[y][x]
+         "lv.q C200, %1\n" // vy[y][x]
+         "vuc2i.s C100, S300\n"
+         "vuc2i.s C110, S301\n"
+         "vuc2i.s C120, S302\n"
+         "vi2f.q C100, C100, 23\n"
+         "vi2f.q C110, C110, 23\n"
+         "vi2f.q C120, C120, 23\n"
+         "vcmp.q EQ, C100, C100[1,1,1,1]\n" // bmap[y][x] == [1,1,1,1] -> cc result
+         "vcmovt.s S130, S130[0], 0\n" // [0,x,x,x] if cc[0]
+         "vcmovt.s S131, S131[0], 1\n" // [x,0,x,x] if cc[1]
+         "vcmovt.s S132, S132[0], 2\n" // [x,x,0,x] if cc[2]
+         "vcmovt.s S133, S133[0], 3\n" // [x,x,x,0] if cc[3]
+         "vcmp.q EQ, C110, C110[1,1,1,1]\n" // bmap[y][x+1] == [1,1,1,1] -> cc result
+         "vcmovt.s S130, S130[0], 0\n" // [0,x,x,x] if cc[0]
+         "vcmovt.s S131, S131[0], 1\n" // [x,0,x,x] if cc[1]
+         "vcmovt.s S132, S132[0], 2\n" // [x,x,0,x] if cc[2]
+         "vcmovt.s S133, S133[0], 3\n" // [x,x,x,0] if cc[3]
+         "vcmp.q EQ, C100, C100[1,1,1,1]\n" // bmap[y][x] == [1,1,1,1] -> cc result
+         "vcmovt.s S200, S200[0], 0\n" // [0,x,x,x] if cc[0]
+         "vcmovt.s S201, S201[0], 1\n" // [x,0,x,x] if cc[1]
+         "vcmovt.s S202, S202[0], 2\n" // [x,x,0,x] if cc[2]
+         "vcmovt.s S203, S203[0], 3\n" // [x,x,x,0] if cc[3]
+         "vcmp.q EQ, C120, C120[1,1,1,1]\n" // bmap[y+1][x] == [1,1,1,1] -> cc result
+         "vcmovt.s S200, S200[0], 0\n" // [0,x,x,x] if cc[0]
+         "vcmovt.s S201, S201[0], 1\n" // [x,0,x,x] if cc[1]
+         "vcmovt.s S202, S202[0], 2\n" // [x,x,0,x] if cc[2]
+         "vcmovt.s S203, S203[0], 3\n" // [x,x,x,0] if cc[3]
+         "sv.q C130, %0\n"
+         "sv.q C200, %1\n"
+        : "+m"(vx[y][x]), "+m"(vy[y][x]) : "m"(bmap[y][x]), "m"(bmap[y][x+1]), "m"(bmap[y+1][x]));
+        */
 }
 
 	#else
@@ -230,9 +268,15 @@ void update_air(void)
 	    ovy[y][x] = dy;
 	    opv[y][x] = dp;
 	}
+#ifdef VFPU
+    memcpy_vfpu(vx, ovx, sizeof(vx));
+    memcpy_vfpu(vy, ovy, sizeof(vy));
+    memcpy_vfpu(pv, opv, sizeof(pv));
+#else
     memcpy(vx, ovx, sizeof(vx));
     memcpy(vy, ovy, sizeof(vy));
     memcpy(pv, opv, sizeof(pv));
+#endif
 }
 
 unsigned clamp_flt(float f, float min, float max)
@@ -1010,7 +1054,7 @@ void update_particles(unsigned *vid)
 				parts[r>>8].vy = 0.25f*parts[r>>8].vy + parts[i].vy;
 				pv[y/CELL][x/CELL] += 2.00f * CFDS;
 				fe ++;
-			    }                           
+			    }
 			if((r&0xFF)==PT_GUNP && 15>(psp_rand()%1000))
                                parts[r>>8].type = PT_DUST;
                            if((r&0xFF)==PT_PLEX && 15>(psp_rand()%1000))
@@ -1202,7 +1246,6 @@ void update_particles(unsigned *vid)
                         kill_part(i);
                         continue;
                     } else if(try_move(i, x, y, 2*x-nx, ny)) {
-			
 			parts[i].x = 2*x-nx;
 			parts[i].y = iy;
 			parts[i].vx *= collision[t];

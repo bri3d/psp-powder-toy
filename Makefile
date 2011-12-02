@@ -1,5 +1,5 @@
 TARGET = powder
-OBJS   = powder.o
+OBJS   = powder.o vfpu.o
  
 INCDIR   =
 CFLAGS   = -G0 -O3 -Wall -DPSP -DJOYSTICK -DSCALE=1 -DBGR -DFPS -DVFPU
