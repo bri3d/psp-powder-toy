@@ -2,6 +2,9 @@
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
+#ifndef MACOSX
+#include <malloc.h>
+#endif
 #include <SDL/SDL.h>
 #ifdef PSP
 #define JOYSTICK
@@ -1791,10 +1794,14 @@ int SDL_main(int argc, char *argv[])
 int main(int argc, char *argv[])
 #endif
 {
-  #ifdef PSP
+#ifdef PSP
         scePowerSetClockFrequency(333, 333, 166);
-    #endif
+#endif
+#ifndef MACOSX
     unsigned *vid_buf = memalign(16, XRES*(YRES+40)*sizeof(unsigned));
+#else
+    unsigned *vid_buf = calloc(XRES*(YRES+40), sizeof(unsigned));
+#endif
     int i, j, vs = 0;
     int x, y, b = 0, sl=1, sr=0, c, lb = 0, lx = 0, ly = 0, lm = 0, tx, ty;
     int da = 0, db = 0, it = 2047;

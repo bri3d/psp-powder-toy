@@ -2,7 +2,7 @@ TARGET = powder
 OBJS   = powder.o vfpu.o
  
 INCDIR   =
-CFLAGS   = -G0 -O3 -Wall -DPSP -DJOYSTICK -DSCALE=1 -DBGR -DFPS -DVFPU
+CFLAGS   = -G0 -O3 -Wall -DPSP -DJOYSTICK -DSCALE=1 -DBGR -DVFPU
 CXXFLAGS = $(CFLAGS) -fno-exceptions -fno-rtti
 ASFLAGS  = $(CFLAGS)
  
