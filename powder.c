@@ -8,7 +8,7 @@
 #include <pspkernel.h>
 #include <psptypes.h>
 PSP_HEAP_SIZE_KB(-1024);
-PSP_MAIN_THREAD_ATTR(PSP_THREAD_ATTR_VFPU);
+PSP_MAIN_THREAD_ATTR(THREAD_ATTR_USER | PSP_THREAD_ATTR_VFPU);
 #endif
 
 inline int psp_rand();
@@ -22,7 +22,7 @@ int JOY_GetModState();
 #define XRES	480
 #define YRES	232
 #define RAND_MAX 2147483648
-#define CELL    8
+#define CELL    4
 #define ISTP    (CELL/2)
 #define CFDS 	(4.0f/CELL)
 char *it_msg =
@@ -63,6 +63,8 @@ static ScePspFVector4 ploss = {PLOSS, PLOSS, PLOSS, PLOSS};
 static ScePspFVector4 tstepp = {TSTEPP, TSTEPP, TSTEPP, TSTEPP};
 static ScePspFVector4 vloss = {VLOSS, VLOSS, VLOSS, VLOSS};
 static ScePspFVector4 tstepv = {TSTEPV, TSTEPV, TSTEPV, TSTEPV};
+ScePspFVector4 vxyxm1 = {0.0f, 0.0f, 0.0f, 0.0f};
+ScePspFVector4 pvyxp1 = {0.0f, 0.0f, 0.0f, 0.0f};
 #endif
 
 float kernel[9];
@@ -76,7 +78,7 @@ void make_kernel(void)
 	    s += kernel[(i+1)+3*(j+1)];
 	}
    #ifdef VFPU
-    __asm__ volatile (
+    __asm__ (
         "mtv %1, S000\n"
         "vrcp.s  S000, S000\n"
          "mfv     %0, S000\n"
@@ -96,8 +98,9 @@ void update_air(void)
 
     for(y=1; y<YRES/CELL; y++) {
         #ifdef VFPU
-        for(x=1; x<XRES/CELL-4; x+=4) {
-        __asm__ volatile (
+        for(x=0; x<XRES/CELL-3; x+=4) {
+        memcpy(&vx[y][x-1], &vxyxm1, 16); // Copy to aligned ScePspFVector
+        __asm__ (
                 "lv.q C100, %1\n"
                 "lv.q C110, %2\n"
                 "lv.q C120, %3\n"
@@ -112,25 +115,8 @@ void update_air(void)
                 "vmul.q C100, C130, C100\n"
                 "vadd.q C100, C110, C100\n"
                 "sv.q C100, %0\n"
-         : "+m"(pv[y][x]) : "m"(vx[y][x]), "m"(vx[y][x-1]), "m"(vy[y][x]), "m"(vy[y-1][x]), "m"(ploss), "m"(tstepp));
+         : "+m"(pv[y][x]) : "m"(vx[y][x]), "m"(vxyxm1), "m"(vy[y][x]), "m"(vy[y-1][x]), "m"(ploss), "m"(tstepp));
         }
-	x = XRES/CELL-3;	
-        __asm__ volatile (
-                "lv.q C100, %1\n"
-                "lv.q C110, %2\n"
-                "lv.q C120, %3\n"
-                "lv.q C130, %4\n"
-                "vsub.q C100, C110, C100\n"
-                "vsub.q C110, C130, C120\n"
-                "lv.q C120, %5\n"
-                "lv.q C130, %6\n"
-                "vadd.q C100, C100, C110\n"
-                "lv.q C110, %0\n"
-                "vmul.q C110, C120, C110\n"
-                "vmul.q C100, C130, C100\n"
-                "vadd.q C100, C110, C100\n"
-                "sv.q C100, %0\n"
-         : "+m"(pv[y][x]) : "m"(vx[y][x]), "m"(vx[y][x-1]), "m"(vy[y][x]), "m"(vy[y-1][x]), "m"(ploss), "m"(tstepp));
 	#else
 	for(x=1; x<XRES/CELL; x++) {
 	    dp = 0.0f;
@@ -143,8 +129,9 @@ void update_air(void)
     }
     for(y=0; y<YRES/CELL-1; y++) {
 	#ifdef VFPU
-	        for(x=0; x<XRES/CELL-4; x+=4) {
-        __asm__ volatile (
+	        for(x=0; x<XRES/CELL-3; x+=4) {
+                memcpy(&pv[y][x+1], &pvyxp1, 16); // copy offset into aligned vector
+        __asm__ (
                 "lv.q C100, %2\n"
                 "lv.q C110, %3\n"
                 "lv.q C120, %4\n"
@@ -162,47 +149,8 @@ void update_air(void)
                 "vadd.q C130, C120, C130\n" // vy + dy
                 "sv.q C100, %0\n"
                 "sv.q C130, %1\n"
-        : "+m"(vx[y][x]), "+m"(vy[y][x]) : "m"(pv[y][x]), "m"(pv[y][x+1]), "m"(pv[y+1][x]), "m"(vloss), "m"(tstepv));
-        for(i=0;i<4;i++) {
-                if(bmap[y][x+i] == 1 || bmap[y][x+i+1] == 1) {
-                        vx[y][x+i] = 0;
-                }
-                if(bmap[y][x+i] == 1 || bmap[y+1][x+i] == 1) {
-                        vy[y][x+i] = 0;
-                }
-        }
+        : "+m"(vx[y][x]), "+m"(vy[y][x]) : "m"(pv[y][x]), "m"(pvyxp1), "m"(pv[y+1][x]), "m"(vloss), "m"(tstepv));
 	}
-	x = XRES/CELL - 4;
-	 ScePspFVector4 pvyx = {pv[y][x], pv[y][x+1], pv[y][x+2], 0};
-            ScePspFVector4 pvyxp1 = {pv[y][x+1], pv[y][x+2], pv[y][x+3], 0};
-            ScePspFVector4 pvyp1x = {pv[y+1][x], pv[y+1][x+1], pv[y+1][x+2], 0};
-            ScePspFVector4 vxyx = {vx[y][x], vx[y][x+1], vx[y][x+2], 0};
-            ScePspFVector4 vyyx = {vy[y][x], vy[y][x+1], vy[y][x+2], 0};
-        __asm__ volatile (
-                "lv.q C100, %2\n"
-                "lv.q C110, %3\n"
-                "lv.q C120, %4\n"
-                "vsub.q C110,C100,C110\n" // C110 = dx
-                "vsub.q C120,C100,C120\n" // C120 = dy
-                "lv.q C100, %0\n"
-                "lv.q C130, %1\n"
-                "lv.q C200, %5\n"
-                "lv.q C210, %6\n"
-                "vmul.q C100, C200, C100\n" // vx * vloss
-                "vmul.q C130, C200, C130\n" // vy * vloss
-                "vmul.q C110, C210, C110\n" // dx * tstepv
-                "vmul.q C120, C210, C120\n" // dy * tstepv
-                "vadd.q C100, C110, C100\n" // vx + dx
-                "vadd.q C130, C120, C130\n" // vy + dy
-                "sv.q C100, %0\n"
-                "sv.q C130, %1\n"
-        : "+m"(vxyx), "+m"(vyyx) : "m"(pvyx), "m"(pvyxp1), "m"(pvyp1x), "m"(vloss), "m"(tstepv));
-        vx[y][x] = vxyx.x;
-        vx[y][x+1] = vxyx.y;
-        vx[y][x+2] = vxyx.z;
-        vy[y][x] = vyyx.x;
-        vy[y][x+1] = vyyx.y;
-        vy[y][x+2] = vyyx.z;
         for(i=0;i<4;i++) {
                 if(bmap[y][x+i] == 1 || bmap[y][x+i+1] == 1) {
                         vx[y][x+i] = 0;
@@ -230,8 +178,6 @@ void update_air(void)
 	}
 }
 	#endif
-	
-
     for(y=0; y<YRES/CELL; y++)
 	for(x=0; x<XRES/CELL; x++) {
 	    dx = 0.0f;
@@ -820,7 +766,7 @@ int create_part(int p, int x, int y, int t)
 	float a = (psp_rand()%360)*3.14159f/180.0f;
 	parts[i].life = psp_rand()%120+480;
         #ifdef VFPU
-        __asm__ volatile (
+        __asm__ (
         "mtv %2, S000\n"
         "mtv %3, S001\n"
         "vcst.s  S002, VFPU_2_PI\n"
@@ -2025,8 +1971,8 @@ int main(int argc, char *argv[])
 
 inline int psp_rand() {
 #ifdef VFPU
-	int result;
-	__asm__ volatile (
+	register int result;
+	__asm__ (
 	"vrndi.s S000\n"
 	"mfv %0, S000\n"
 	: "=r"(result));

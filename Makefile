@@ -2,7 +2,7 @@ TARGET = powder
 OBJS   = powder.o
  
 INCDIR   =
-CFLAGS   = -G0 -Wall -Os -ffast-math -DPSP -DVFPU -DJOYSTICK -DSCALE=1
+CFLAGS   = -G0 -Os -ffast-math -Wall -DPSP -DJOYSTICK -DVFPU -DSCALE=1
 CXXFLAGS = $(CFLAGS) -fno-exceptions -fno-rtti
 ASFLAGS  = $(CFLAGS)
  
@@ -10,7 +10,8 @@ LIBDIR  =
 LDFLAGS =
 LIBS    = -lSDLmain -lSDL -lpspgu -lpspaudio -lpsphprm -lpspirkeyb -lpsppower -lm
  
-BUILD_PRX = 1 
+PSP_FW_VERSION = 200
+BUILD_PRX = 1
  
 EXTRA_TARGETS   = EBOOT.PBP
 PSP_EBOOT_TITLE = Powder
