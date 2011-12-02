@@ -63,7 +63,6 @@ static ScePspFVector4 ploss = {PLOSS, PLOSS, PLOSS, PLOSS};
 static ScePspFVector4 tstepp = {TSTEPP, TSTEPP, TSTEPP, TSTEPP};
 static ScePspFVector4 vloss = {VLOSS, VLOSS, VLOSS, VLOSS};
 static ScePspFVector4 tstepv = {TSTEPV, TSTEPV, TSTEPV, TSTEPV};
-ScePspFVector4 tempalign = {0.0f, 0.0f, 0.0f, 0.0f};
 #endif
 
 float kernel[9];
@@ -98,10 +97,9 @@ void update_air(void)
     for(y=1; y<YRES/CELL; y++) {
         #ifdef VFPU
         for(x=0; x<XRES/CELL-3; x+=4) {
-        memcpy(&tempalign, &vx[y][x-1], 16); // Copy to aligned ScePspFVector
         __asm__ (
                 "lv.q C100, %1\n"
-                "lv.q C110, %2\n"
+                "ulv.q C110, %2\n"
                 "lv.q C120, %3\n"
                 "lv.q C130, %4\n"
                 "vsub.q C100, C110, C100\n"
@@ -114,7 +112,7 @@ void update_air(void)
                 "vmul.q C100, C130, C100\n"
                 "vadd.q C100, C110, C100\n"
                 "sv.q C100, %0\n"
-         : "+m"(pv[y][x]) : "m"(vx[y][x]), "m"(tempalign), "m"(vy[y][x]), "m"(vy[y-1][x]), "m"(ploss), "m"(tstepp));
+         : "+m"(pv[y][x]) : "m"(vx[y][x]), "m"(vx[y][x-1]), "m"(vy[y][x]), "m"(vy[y-1][x]), "m"(ploss), "m"(tstepp));
         }
 	#else
 	for(x=1; x<XRES/CELL; x++) {
@@ -129,10 +127,9 @@ void update_air(void)
     for(y=0; y<YRES/CELL-1; y++) {
 	#ifdef VFPU
 	        for(x=0; x<XRES/CELL-3; x+=4) {
-                memcpy(&tempalign, &pv[y][x+1], 16); // copy offset into aligned vector
         __asm__ (
                 "lv.q C100, %2\n"
-                "lv.q C110, %3\n"
+                "ulv.q C110, %3\n"
                 "lv.q C120, %4\n"
                 "vsub.q C110,C100,C110\n" // C110 = dx
                 "vsub.q C120,C100,C120\n" // C120 = dy
@@ -148,7 +145,7 @@ void update_air(void)
                 "vadd.q C130, C120, C130\n" // vy + dy
                 "sv.q C100, %0\n"
                 "sv.q C130, %1\n"
-        : "+m"(vx[y][x]), "+m"(vy[y][x]) : "m"(pv[y][x]), "m"(tempalign), "m"(pv[y+1][x]), "m"(vloss), "m"(tstepv));
+        : "+m"(vx[y][x]), "+m"(vy[y][x]) : "m"(pv[y][x]), "m"(pv[y][x+1]), "m"(pv[y+1][x]), "m"(vloss), "m"(tstepv));
 	}
         for(i=0;i<4;i++) {
                 if(bmap[y][x+i] == 1 || bmap[y][x+i+1] == 1) {
