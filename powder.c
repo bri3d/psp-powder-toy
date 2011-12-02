@@ -108,9 +108,11 @@ void update_air(void)
                 "lv.q C130, %6\n"
                 "vadd.q C100, C100, C110\n"
                 "lv.q C110, %0\n"
+                "cache 0x1B, %0\n" // speculative: evict the cache before we write to it
                 "vmul.q C110, C120, C110\n"
                 "vmul.q C100, C130, C100\n"
                 "vadd.q C100, C110, C100\n"
+                "sync\n" // wait for allegrex to finish the writeback we asked for
                 "sv.q C100, %0\n"
          : "+m"(pv[y][x]) : "m"(vx[y][x]), "m"(vx[y][x-1]), "m"(vy[y][x]), "m"(vy[y-1][x]), "m"(ploss), "m"(tstepp));
         }
@@ -135,6 +137,8 @@ void update_air(void)
                 "vsub.q C120,C100,C120\n" // C120 = dy
                 "lv.q C100, %0\n"
                 "lv.q C130, %1\n"
+                "cache 0x1B, %0\n"
+                "cache 0x1B, %1\n"
                 "lv.q C200, %5\n"
                 "lv.q C210, %6\n"
                 "vmul.q C100, C200, C100\n" // vx * vloss
@@ -143,6 +147,7 @@ void update_air(void)
                 "vmul.q C120, C210, C120\n" // dy * tstepv
                 "vadd.q C100, C110, C100\n" // vx + dx
                 "vadd.q C130, C120, C130\n" // vy + dy
+                "sync\n"
                 "sv.q C100, %0\n"
                 "sv.q C130, %1\n"
         : "+m"(vx[y][x]), "+m"(vy[y][x]) : "m"(pv[y][x]), "m"(pv[y][x+1]), "m"(pv[y+1][x]), "m"(vloss), "m"(tstepv));
