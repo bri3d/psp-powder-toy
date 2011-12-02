@@ -1358,7 +1358,11 @@ void sdl_blit(int x, int y, int w, int h, unsigned int *src, int pitch)
     dst=(unsigned *)sdl_scrn->pixels+y*sdl_scrn->pitch/4+x;
     for(j=0;j<h;j++) {
 #if (SCALE==1)
+#ifdef VFPU
         memcpy_vfpu(dst, src, w*sizeof(unsigned));
+#else
+        memcpy(dst, src, w*sizeof(unsigned));
+#endif
         dst+=sdl_scrn->pitch/4;
 #elif (SCALE==2)
         for(k=0;k<SCALE;k++) {
@@ -1790,8 +1794,7 @@ int main(int argc, char *argv[])
   #ifdef PSP
         scePowerSetClockFrequency(333, 333, 166);
     #endif
-
-    unsigned *vid_buf = calloc(XRES*(YRES+40), sizeof(unsigned));
+    unsigned *vid_buf = memalign(16, XRES*(YRES+40)*sizeof(unsigned));
     int i, j, vs = 0;
     int x, y, b = 0, sl=1, sr=0, c, lb = 0, lx = 0, ly = 0, lm = 0, tx, ty;
     int da = 0, db = 0, it = 2047;
