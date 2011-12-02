@@ -2,7 +2,7 @@ TARGET = powder
 OBJS   = powder.o
  
 INCDIR   =
-CFLAGS   = -G0 -Os -ffast-math -Wall -DPSP -DJOYSTICK -DVFPU -DSCALE=1
+CFLAGS   = -G0 -Os -ffast-math -Wall -DPSP -DJOYSTICK -DVFPU -DSCALE=1 -DBGR
 CXXFLAGS = $(CFLAGS) -fno-exceptions -fno-rtti
 ASFLAGS  = $(CFLAGS)
  
