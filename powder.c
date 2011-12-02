@@ -1358,7 +1358,7 @@ void sdl_blit(int x, int y, int w, int h, unsigned int *src, int pitch)
     dst=(unsigned *)sdl_scrn->pixels+y*sdl_scrn->pitch/4+x;
     for(j=0;j<h;j++) {
 #if (SCALE==1)
-        memcpy(dst, src, w*sizeof(unsigned));
+        memcpy_vfpu(dst, src, w*sizeof(unsigned));
         dst+=sdl_scrn->pitch/4;
 #elif (SCALE==2)
         for(k=0;k<SCALE;k++) {
