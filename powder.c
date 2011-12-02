@@ -99,7 +99,7 @@ void update_air(void)
     for(y=1; y<YRES/CELL; y++) {
         #ifdef VFPU
         for(x=0; x<XRES/CELL-3; x+=4) {
-        memcpy(&vx[y][x-1], &vxyxm1, 16); // Copy to aligned ScePspFVector
+        memcpy(&vxyxm1, &vx[y][x-1], 16); // Copy to aligned ScePspFVector
         __asm__ (
                 "lv.q C100, %1\n"
                 "lv.q C110, %2\n"
@@ -130,7 +130,7 @@ void update_air(void)
     for(y=0; y<YRES/CELL-1; y++) {
 	#ifdef VFPU
 	        for(x=0; x<XRES/CELL-3; x+=4) {
-                memcpy(&pv[y][x+1], &pvyxp1, 16); // copy offset into aligned vector
+                memcpy(&pvyxp1, &pv[y][x+1], 16); // copy offset into aligned vector
         __asm__ (
                 "lv.q C100, %2\n"
                 "lv.q C110, %3\n"
@@ -1757,7 +1757,11 @@ int main(int argc, char *argv[])
     int x, y, b = 0, sl=1, sr=0, c, lb = 0, lx = 0, ly = 0, lm = 0, tx, ty;
     int da = 0, db = 0, it = 2047;
     SDLMod mk = 0;
-
+#ifdef FPS
+    Uint32 start_ticks;
+    Uint32 delta_ticks;
+    char *fps_text = calloc(8, sizeof(char));
+#endif
     parts = calloc(sizeof(particle), NPART);
     for(i=0; i<NPART-1; i++)
 	parts[i].life = i+1;
@@ -1768,6 +1772,9 @@ int main(int argc, char *argv[])
 
     sdl_open();
     while(!sdl_poll()) {
+#ifdef FPS
+        start_ticks = SDL_GetTicks();
+#endif
 	for(i=0; i<YRES/CELL; i++) {
 	    pv[i][1] = pv[i][2]*0.9f;
 	    pv[i][2] = pv[i][3]*0.9f;
@@ -1956,14 +1963,18 @@ int main(int argc, char *argv[])
 		drawtext(vid_buf, 16, YRES-24, "Wall. Indestructible. Blocks everything.", 255, 255, 255, da*5);
 		break;
 	    default:
-		drawtext(vid_buf, 16, YRES-24, descs[db], 255, 255, 255, da*5);
+		drawtext(vid_buf, 16, YRES-24, descs[db], 255, 255, 255, 255);
 	    }
 
 	if(it) {
 	    it--;
 	    drawtext(vid_buf, 16, 20, it_msg, 255, 255, 255, it>51?255:it*5);
 	}
-
+#ifdef FPS
+        delta_ticks = SDL_GetTicks() - start_ticks;
+        sprintf(fps_text, "FPS: %u", (1000 / delta_ticks));
+        drawtext(vid_buf, 16, YRES-48, fps_text, 255, 255, 255, 255);
+#endif
 	sdl_blit(0, 0, XRES, YRES+40, vid_buf, XRES*4);
     }
     return 0;
