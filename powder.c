@@ -107,15 +107,15 @@ void update_air(void)
                 "ulv.q C110, %2\n"
                 "lv.q C120, %3\n"
                 "lv.q C130, %4\n"
+                "lv.q C200, %5\n"
+                "lv.q C210, %6\n"
+                "lv.q C220, %0\n"
                 "vsub.q C100, C110, C100\n"
                 "vsub.q C110, C130, C120\n"
-                "lv.q C120, %5\n"
-                "lv.q C130, %6\n"
                 "vadd.q C100, C100, C110\n"
-                "lv.q C110, %0\n"
-                "vmul.q C110, C120, C110\n"
-                "vmul.q C100, C130, C100\n"
-                "vadd.q C100, C110, C100\n"
+                "vmul.q C220, C200, C220\n"
+                "vmul.q C100, C210, C100\n"
+                "vadd.q C100, C220, C100\n"
                 "sv.q C100, %0\n"
          : "+m"(pv[y][x]) : "m"(vx[y][x]), "m"(vx[y][x-1]), "m"(vy[y][x]), "m"(vy[y-1][x]), "m"(ploss), "m"(tstepp));
         }
@@ -133,15 +133,15 @@ void update_air(void)
 	#ifdef VFPU
 	        for(x=0; x<XRES/CELL-3; x+=4) {
         __asm__ (
-                "lv.q C100, %2\n"
+                "lv.q C300, %2\n"
                 "ulv.q C110, %3\n"
                 "lv.q C120, %4\n"
-                "vsub.q C110,C100,C110\n" // C110 = dx
-                "vsub.q C120,C100,C120\n" // C120 = dy
                 "lv.q C100, %0\n"
                 "lv.q C130, %1\n"
                 "lv.q C200, %5\n"
                 "lv.q C210, %6\n"
+                "vsub.q C110,C300,C110\n" // C110 = dx
+                "vsub.q C120,C300,C120\n" // C120 = dy
                 "vmul.q C100, C200, C100\n" // vx * vloss
                 "vmul.q C130, C200, C130\n" // vy * vloss
                 "vmul.q C110, C210, C110\n" // dx * tstepv
