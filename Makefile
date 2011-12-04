@@ -2,13 +2,13 @@ TARGET = powder
 OBJS   = powder.o vfpu.o
  
 INCDIR   =
-CFLAGS   = -G0 -O3 -Wall -DPSP -DJOYSTICK -DSCALE=1 -DBGR -DVFPU -DFPS
+CFLAGS   = -G0 -O3 -Wall -DPSP -DJOYSTICK -DSCALE=1 -DFPS -DVFPU
 CXXFLAGS = $(CFLAGS) -fno-exceptions -fno-rtti
 ASFLAGS  = $(CFLAGS)
  
 LIBDIR  =
 LDFLAGS =
-LIBS    = -lSDLmain -lSDL -lpspgu -lpspaudio -lpsphprm -lpspirkeyb -lpsppower -lm
+LIBS    = -lpspaudio -lpspctrl -lpsprtc -lpsphprm -lpspirkeyb -lpsppower -lpspdisplay -lm 
  
 PSP_FW_VERSION = 200
 BUILD_PRX = 1
