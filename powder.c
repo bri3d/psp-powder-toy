@@ -273,18 +273,20 @@ unsigned clamp_flt(float f, float min, float max)
 
 void draw_air(pixel *vid)
 {
-    int x, y, i, j;
+    int x, y, i, j, ci;
     pixel c;
-
+	unsigned int bvals[4];
+	unsigned int gvals[4];
+	unsigned int rvals[4];
     for(y=0; y<YRES/CELL; y++)
-	for(x=0; x<XRES/CELL; x++) {
-/*
+	for(x=0; x<XRES/CELL; x+=4) {
             __asm__ (
-              "lv.q C100, %1\n" // pv[y][x]
-              "lv.q C110, %2\n" // vx[y][x]
-              "lv.q C120, %3\n" // vy[y][x]
+			// TODO: Potentially locate a faster way to make the results 565 pixels and fill across.
+              "lv.q C100, %3\n" // pv[y][x]
+              "lv.q C110, %4\n" // vx[y][x]
+              "lv.q C120, %5\n" // vy[y][x]
               "vabs.q C110, C110\n" // abs
-	      "vabs.q C120, C120\n"
+			  "vabs.q C120, C120\n"
               "viim.s S300, 8\n"
               "vrcp.s S300, S300\n" // load 1/8
               "vscl.q C100, C100, S300\n" // scale by 1/8
@@ -293,23 +295,24 @@ void draw_air(pixel *vid)
               "vsat0.q C100, C100\n" // saturate == clamp
               "vsat0.q C110, C100\n"
               "vsat0.q C120, C120\n"
-              "viim.s S300, 255\n"
-              "vscl.q C100, C100, S300\n"
-              "vscl.q C110, C110, S300\n"
-              "vscl.q C120, C120, S300\n"
-              "vt5650.q C200, R100\n"
-              "vt5650.q C202, R101\n"
-              "vt5650.q C210, R102\n"
-              "vt5650.q C212, R103\n"
-              "sv.q C200, %0\n"
-      //        "sv.q C210, %0\n"
-              // TODO
-              : "+m"(vid[x*CELL + (y*XRES*CELL)]) : "m"(pv[y][x]), "m"(vx[y][x]), "m"(vy[y][x]));
-*/
-            c  = PIXRGB(clamp_flt(pv[y][x], 0.0f, 8.0f), clamp_flt(fabs(vx[y][x]), 0.0f, 8.0f), clamp_flt(fabs(vy[y][x]), 0.0f, 8.0f));
-	    for(j=0; j<CELL; j++)
-		for(i=0; i<CELL; i++)
-		    vid[(x*CELL+i) + (y*CELL+j)*XWIDTH] = c;
+			  "vf2iz.q C100, C100, 8\n"
+			  "vf2iz.q C110, C110, 8\n"
+			  "vf2iz.q C120, C120, 8\n"
+			  "sv.q C100, %0\n"
+			  "sv.q C110, %1\n"
+			  "sv.q C120, %2\n"
+              : "+m"(rvals), "+m"(gvals), "+m"(bvals) : "m"(pv[y][x]), "m"(vx[y][x]), "m"(vy[y][x]));
+			  for (ci = 0; ci < 4; ci++)
+			  {
+				 c  = PIXRGB(rvals[ci], gvals[ci], bvals[ci]);
+				 for(j=0; j<CELL; j++)
+				 for(i=0; i<CELL; i++)
+					vid[(x*CELL+(ci * CELL)+i) + (y*CELL+j)*XWIDTH] = c;
+			  }
+           // c  = PIXRGB(clamp_flt(pv[y][x], 0.0f, 8.0f), clamp_flt(fabs(vx[y][x]), 0.0f, 8.0f), clamp_flt(fabs(vy[y][x]), 0.0f, 8.0f));
+	    //for(j=0; j<CELL; j++)
+		//for(i=0; i<CELL; i++)
+		    //vid[(x*CELL+i) + (y*CELL+j)*XWIDTH] = c;
 	}
 }
 
