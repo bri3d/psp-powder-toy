@@ -22,11 +22,11 @@ PSP_MAIN_THREAD_ATTR(THREAD_ATTR_USER | PSP_THREAD_ATTR_VFPU);
 
 #define PIXEL_SIZE 2
 typedef unsigned short pixel; // 16BPP 5650, kthxbye
-#define PIXPACK(x) ((((x)>>8)&0xF800)|(((x)>>5)&0x07E0)|(((x)>>3)&0x001F))
-#define PIXRGB(r,g,b) ((((r)<<8)&0xF800)|(((g)<<3)&0x07E0)|(((b)>>3)&0x001F))
-#define PIXR(x) (((x)>>8)&0xF8)
+#define PIXPACK(x) PIXRGB(((x & 0xFF0000) >> 16), ((x & 0x00FF00) >> 8), (x & 0x0000FF))
+#define PIXRGB(r,g,b) ((((b)<<8)&0xF800)|(((g)<<3)&0x07E0)|(((r)>>3)&0x001F))
+#define PIXB(x) (((x)>>8)&0xF8)
 #define PIXG(x) (((x)>>3)&0xFC)
-#define PIXB(x) (((x)<<3)&0xF8)
+#define PIXR(x) (((x)<<3)&0xF8)
 
 inline int psp_rand();
 int PSP_GetCursorState(int *x, int *y, pixel *vid_buf, int *sl, int *sr);
@@ -35,6 +35,7 @@ int PSP_GetModState();
 #undef PLOSS
 #define FLAG_STAGNANT 1
 #define XRES	480
+#define XWIDTH  512
 #define YRES	232
 #define RAND_MAX 2147483648
 #define CELL    4
@@ -108,6 +109,7 @@ void update_air(void)
     float dp, dx, dy, f, tx, ty;
 
     for(y=1; y<YRES/CELL; y++) {
+	/*
         #ifdef VFPU
         for(x=0; x<XRES/CELL-3; x+=4) {
         __asm__ (
@@ -128,6 +130,7 @@ void update_air(void)
          : "+m"(pv[y][x]) : "m"(vx[y][x]), "m"(vx[y][x-1]), "m"(vy[y][x]), "m"(vy[y-1][x]), "m"(ploss), "m"(tstepp));
         }
 	#else
+	*/
 	for(x=1; x<XRES/CELL; x++) {
 	    dp = 0.0f;
 	    dp += vx[y][x-1] - vx[y][x];
@@ -135,9 +138,12 @@ void update_air(void)
 	    pv[y][x] *= PLOSS;
 	    pv[y][x] += dp*TSTEPP;
 	}
+	/*
 	#endif
+	*/
     }
     for(y=0; y<YRES/CELL-1; y++) {
+	/*
 	#ifdef VFPU
 	        for(x=0; x<XRES/CELL-3; x+=4) {
         __asm__ (
@@ -171,6 +177,7 @@ void update_air(void)
 }
 
 	#else
+	*/
 	for(x=0; x<XRES/CELL-1; x++) {
 	    dx = dy = 0.0f;
 	    dx += pv[y][x] - pv[y][x+1];
@@ -185,7 +192,9 @@ void update_air(void)
 		vy[y][x] = 0;
 	}
 }
+/*
 	#endif
+*/
     for(y=0; y<YRES/CELL; y++)
 	for(x=0; x<XRES/CELL; x++) {
 	    dx = 0.0f;
@@ -300,7 +309,7 @@ void draw_air(pixel *vid)
             c  = PIXRGB(clamp_flt(pv[y][x], 0.0f, 8.0f), clamp_flt(fabs(vx[y][x]), 0.0f, 8.0f), clamp_flt(fabs(vy[y][x]), 0.0f, 8.0f));
 	    for(j=0; j<CELL; j++)
 		for(i=0; i<CELL; i++)
-		    vid[(x*CELL+i) + (y*CELL+j)*XRES] = c;
+		    vid[(x*CELL+i) + (y*CELL+j)*XWIDTH] = c;
 	}
 }
 
@@ -819,12 +828,12 @@ void blendpixel(pixel *vid, int x, int y, int r, int g, int b, int a)
     if(x<0 || y<0 || x>=XRES || y>=YRES)
 	return;
     if(a!=255) {
-	t = vid[y*XRES+x];
+	t = vid[y*XWIDTH+x];
 	r = (a*r + (255-a)*((PIXR(t))&255)) >> 8;
 	g = (a*g + (255-a)*((PIXG(t))&255)) >> 8;
 	b = (a*b + (255-a)*(PIXB(t)&255)) >> 8;
     }
-    vid[y*XRES+x] = PIXRGB(r, g, b);
+    vid[y*XWIDTH+x] = PIXRGB(r, g, b);
 }
 
 void update_particles(pixel *vid)
@@ -855,17 +864,17 @@ void update_particles(pixel *vid)
 		for(j=0; j<CELL; j++)
 		    for(i=0; i<CELL; i++) {
 			pmap[y*CELL+j][x*CELL+i] = 0x7FFFFFFF;
-			vid[(y*CELL+j)*XRES+(x*CELL+i)] = PIXPACK(0x808080);
+			vid[(y*CELL+j)*XWIDTH+(x*CELL+i)] = PIXPACK(0x808080);
 		    }
 	    if(bmap[y][x]==2)
 		for(j=0; j<CELL; j+=2)
 		    for(i=(j>>1)&1; i<CELL; i+=2)
-			vid[(y*CELL+j)*XRES+(x*CELL+i)] = PIXPACK(0x808080);
+			vid[(y*CELL+j)*XWIDTH+(x*CELL+i)] = PIXPACK(0x808080);
 	    if(bmap[y][x]==3)
 		for(j=0; j<CELL; j++)
 		    for(i=0; i<CELL; i++)
 			if(!((y*CELL+j)%2) && !((x*CELL+i)%2))
-			    vid[(y*CELL+j)*XRES+(x*CELL+i)] = PIXPACK(0x808080);
+			    vid[(y*CELL+j)*XWIDTH+(x*CELL+i)] = PIXPACK(0x808080);
 	}
 
     for(i=0; i<NPART; i++)
@@ -1275,30 +1284,13 @@ void update_particles(pixel *vid)
 		blendpixel(vid, nx, ny+1, cr, cg, cb, 64);
 		blendpixel(vid, nx, ny-1, cr, cg, cb, 64);
 	    } else
-		vid[ny*XRES+nx] = pcolors[t];
+		vid[ny*XWIDTH+nx] = pcolors[t];
 	}
 }
 
 /***********************************************************
  *                       PSP GRAPHS                        *
  ***********************************************************/
-
-void psp_blit(int x, int y, int w, int h, pixel *src, pixel *dst, int pitch)
-{
-    unsigned j;
-    for(j=0;j<h;j++) {
-#ifdef VFPU
-        memcpy_vfpu(dst, src, w*PIXEL_SIZE);
-#else
-        memcpy(dst, src, w*PIXEL_SIZE);
-#endif
-        dst+=512;
-        src+=pitch;
-    }
-    sceDisplayWaitVblankStart();
-    sceKernelDcacheWritebackAll(); // dump cachelines into vram
-    sceDisplaySetFrameBuf((void*)0x44000000, 512, PSP_DISPLAY_PIXEL_FORMAT_565, PSP_DISPLAY_SETBUF_NEXTFRAME);
-}
 
 int frame_idx=0;
 void dump_frame(unsigned int *src, int w, int h, int pitch)
@@ -1363,12 +1355,12 @@ void drawpixel(pixel *vid, int x, int y, int r, int g, int b, int a)
     if(x<0 || y<0 || x>=XRES || y>=YRES+40)
 	return;
     if(a!=255) {
-	t = vid[y*XRES+x];
+	t = vid[y*XWIDTH+x];
 	r = (a*r + (255-a)*((PIXR(t))&255)) >> 8;
 	g = (a*g + (255-a)*((PIXG(t))&255)) >> 8;
 	b = (a*b + (255-a)*(PIXB(t)&255)) >> 8;
     }
-    vid[y*XRES+x] = PIXRGB(r,g,b);
+    vid[y*XWIDTH+x] = PIXRGB(r,g,b);
 }
 
 int drawchar(pixel *vid, int x, int y, int c, int r, int g, int b, int a)
@@ -1447,7 +1439,7 @@ void draw_tool(pixel *vid_buf, int b, int sl, int sr, pixel pc)
 	for(j=1; j<15; j++)
 	    for(i=1; i<27; i++) {
 		if(!(i%2) && !(j%2))
-		    vid_buf[XRES*(y+j)+(x+i)] = pc;
+		    vid_buf[XWIDTH*(y+j)+(x+i)] = pc;
 	    }
     else if(b==28)
 	for(i=1; i<27; i++) {
@@ -1456,41 +1448,41 @@ void draw_tool(pixel *vid_buf, int b, int sl, int sr, pixel pc)
 	    cb = (int)(64.0f+63.0f*sin(i/4.0f+4.0f));
             pc = PIXRGB(cr, cg, cb);
 	    for(j=1; j<15; j++)
-		vid_buf[XRES*(y+j)+(x+i)] = pc;
+		vid_buf[XWIDTH*(y+j)+(x+i)] = pc;
 	}
     else if(b==29)
 	for(j=1; j<15; j+=2)
 	    for(i=1+(1&(j>>1)); i<27; i+=2)
-		vid_buf[XRES*(y+j)+(x+i)] = pc;
+		vid_buf[XWIDTH*(y+j)+(x+i)] = pc;
     else if(b==30) {
 	for(j=1; j<15; j+=2)
 	    for(i=1+(1&(j>>1)); i<13; i+=2)
-		vid_buf[XRES*(y+j)+(x+i)] = pc;
+		vid_buf[XWIDTH*(y+j)+(x+i)] = pc;
 	for(j=1; j<15; j++)
 	    for(i=14; i<27; i++)
-		vid_buf[XRES*(y+j)+(x+i)] = pc;
+		vid_buf[XWIDTH*(y+j)+(x+i)] = pc;
     } else
 	for(j=1; j<15; j++)
 	    for(i=1; i<27; i++)
-		vid_buf[XRES*(y+j)+(x+i)] = pc;
+		vid_buf[XWIDTH*(y+j)+(x+i)] = pc;
 
     if(b==30 || b==0)
 	for(j=4; j<12; j++) {
-	    vid_buf[XRES*(y+j)+(x+j+6)] = PIXPACK(0xFF0000);
-	    vid_buf[XRES*(y+j)+(x+j+7)] = PIXPACK(0xFF0000);
-	    vid_buf[XRES*(y+j)+(x-j+21)] = PIXPACK(0xFF0000);
-	    vid_buf[XRES*(y+j)+(x-j+22)] = PIXPACK(0xFF0000);
+	    vid_buf[XWIDTH*(y+j)+(x+j+6)] = PIXPACK(0xFF0000);
+	    vid_buf[XWIDTH*(y+j)+(x+j+7)] = PIXPACK(0xFF0000);
+	    vid_buf[XWIDTH*(y+j)+(x-j+21)] = PIXPACK(0xFF0000);
+	    vid_buf[XWIDTH*(y+j)+(x-j+22)] = PIXPACK(0xFF0000);
 	}
     if(b==28)
 	for(j=4; j<12; j++) {
-	    vid_buf[XRES*(y+j)+(x+j)] = PIXPACK(0xFF0000);
-	    vid_buf[XRES*(y+j)+(x+j+1)] = PIXPACK(0xFF0000);
-	    vid_buf[XRES*(y+j)+(x-j+15)] = PIXPACK(0xFF0000);
-	    vid_buf[XRES*(y+j)+(x-j+16)] = PIXPACK(0xFF0000);
-	    vid_buf[XRES*(y+j)+(x+j+11)] = PIXPACK(0xFF0000);
-	    vid_buf[XRES*(y+j)+(x+j+12)] = PIXPACK(0xFF0000);
-	    vid_buf[XRES*(y+j)+(x-j+26)] = PIXPACK(0xFF0000);
-	    vid_buf[XRES*(y+j)+(x-j+27)] = PIXPACK(0xFF0000);
+	    vid_buf[XWIDTH*(y+j)+(x+j)] = PIXPACK(0xFF0000);
+	    vid_buf[XWIDTH*(y+j)+(x+j+1)] = PIXPACK(0xFF0000);
+	    vid_buf[XWIDTH*(y+j)+(x-j+15)] = PIXPACK(0xFF0000);
+	    vid_buf[XWIDTH*(y+j)+(x-j+16)] = PIXPACK(0xFF0000);
+	    vid_buf[XWIDTH*(y+j)+(x+j+11)] = PIXPACK(0xFF0000);
+	    vid_buf[XWIDTH*(y+j)+(x+j+12)] = PIXPACK(0xFF0000);
+	    vid_buf[XWIDTH*(y+j)+(x-j+26)] = PIXPACK(0xFF0000);
+	    vid_buf[XWIDTH*(y+j)+(x-j+27)] = PIXPACK(0xFF0000);
 	}
 
     if(b>0 && b<PT_NUM) {
@@ -1509,12 +1501,12 @@ void draw_tool(pixel *vid_buf, int b, int sl, int sr, pixel pc)
 	if(b==sr)
 	    c |= PIXPACK(0x0000FF);
 	for(i=0; i<30; i++) {
-	    vid_buf[XRES*(y-1)+(x+i-1)] = c;
-	    vid_buf[XRES*(y+16)+(x+i-1)] = c;
+	    vid_buf[XWIDTH*(y-1)+(x+i-1)] = c;
+	    vid_buf[XWIDTH*(y+16)+(x+i-1)] = c;
 	}
 	for(j=0; j<18; j++) {
-	    vid_buf[XRES*(y+j-1)+(x-1)] = c;
-	    vid_buf[XRES*(y+j-1)+(x+28)] = c;
+	    vid_buf[XWIDTH*(y+j-1)+(x-1)] = c;
+	    vid_buf[XWIDTH*(y+j-1)+(x+28)] = c;
 	}
     }
 }
@@ -1633,12 +1625,12 @@ static void xor_pixel(int x, int y, pixel *vid)
     pixel c;
     if(x<0 || y<0 || x>=XRES || y>=YRES)
         return;
-    c = vid[y*XRES+x];
+    c = vid[y*XWIDTH+x];
     c = PIXB(c) + 3*PIXG(c) + 2*PIXR(c);
     if(c<512)
-        vid[y*XRES+x] = PIXPACK(0xC0C0C0);
+        vid[y*XWIDTH+x] = PIXPACK(0xC0C0C0);
     else
-        vid[y*XRES+x] = PIXPACK(0x404040);
+        vid[y*XWIDTH+x] = PIXPACK(0x404040);
 }
 
 void xor_line(int x1, int y1, int x2, int y2, pixel *vid)
@@ -1716,8 +1708,9 @@ int main(int argc, char *argv[])
     scePowerSetClockFrequency(333, 333, 166);
     SetupCallbacks();
     sceDisplaySetMode(0,480,272);
-    pixel *vid_buf = memalign(16, 512*(YRES+40)*PIXEL_SIZE);
-    pixel *frame_buf = (pixel*)sceGeEdramGetAddr();
+    //pixel *vid_buf = memalign(16, 512*(YRES+40)*PIXEL_SIZE);
+    pixel *vid_buf = (pixel*)sceGeEdramGetAddr();
+	pixel *back_buf = (pixel*)sceGeEdramGetAddr()+XWIDTH*(YRES+40)*PIXEL_SIZE;
 
     int i, j, vs = 0;
     int x, y, b = 0, sl=1, sr=0, c, lb = 0, lx = 0, ly = 0, lm = 0, tx, ty;
@@ -1782,7 +1775,7 @@ int main(int argc, char *argv[])
 	draw_air(vid_buf);
 	update_particles(vid_buf);
 
-	memset(vid_buf+(XRES*YRES), 0, PIXEL_SIZE*XRES*40);
+	memset(vid_buf+(XWIDTH*YRES), 0, PIXEL_SIZE*XWIDTH*40);
 	for(b=0; b<PT_NUM; b++)
 	    draw_tool(vid_buf, b, sl, sr, pcolors[b]);
 	draw_tool(vid_buf, 27, sl, sr, PIXPACK(0x808080));
@@ -1923,7 +1916,11 @@ int main(int argc, char *argv[])
         sprintf(fps_text, "FPS: %u", (unsigned int)(1000000 / delta_ticks));
         drawtext(vid_buf, 16, YRES-48, fps_text, 255, 255, 255, 255);
 #endif
-        psp_blit(0, 0, XRES, YRES+40, vid_buf, frame_buf, XRES);
+		sceDisplayWaitVblankStart();
+		sceDisplaySetFrameBuf((void*)vid_buf, XWIDTH, PSP_DISPLAY_PIXEL_FORMAT_565, PSP_DISPLAY_SETBUF_NEXTFRAME);
+		pixel *temp_buf = back_buf;
+		back_buf = vid_buf;
+		vid_buf = temp_buf;
     }
     return 0;
 }
@@ -1987,7 +1984,9 @@ int PSP_GetCursorState(int *x, int *y, pixel *vid_buf, int *sl, int *sr) {
         return 0;
 }
 int PSP_GetModState() {
-        //if(SDL_JoystickGetButton(joy, 0)) return KMOD_CTRL;
-        //if(SDL_JoystickGetButton(joy, 4)) return KMOD_SHIFT;
-        return 0;
+        SceCtrlData pad;
+        sceCtrlPeekBufferPositive(&pad, 1);
+		if (pad.Buttons & PSP_CTRL_LTRIGGER) return 1;
+		if (pad.Buttons & PSP_CTRL_CROSS) return 2;
+		return 0;
 }
